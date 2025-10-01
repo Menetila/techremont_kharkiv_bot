@@ -1,10 +1,10 @@
 import os
 import logging
 import requests
+import asyncio
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
-import asyncio
 
 API_TOKEN = os.getenv("API_TOKEN")
 APPSCRIPT_URL = os.getenv("APPSCRIPT_URL")  # URL веб-додатку з Apps Script
@@ -22,7 +22,6 @@ user_state = {}
 
 # Кнопки
 cancel_kb = ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text="❌ Скасувати")]], resize_keyboard=True)
-
 device_kb = ReplyKeyboardMarkup(
     keyboard=[
         [KeyboardButton(text="📱 Телефон"), KeyboardButton(text="💻 Ноутбук")],
@@ -68,7 +67,7 @@ async def collect(message: types.Message):
         # надсилаємо у Google Sheets
         try:
             requests.post(APPSCRIPT_URL, json={
-                "id": uid,
+                "user_id": uid,
                 "name": user_state[uid]["name"],
                 "phone": user_state[uid]["phone"],
                 "device": user_state[uid]["device"],
@@ -78,6 +77,7 @@ async def collect(message: types.Message):
         except Exception as e:
             logging.error(f"Помилка відправки в Google: {e}")
             await message.answer("⚠ Не вдалося записати заявку. Спробуйте пізніше.")
+
         user_state.pop(uid, None)
 
 # Запуск
