@@ -1,10 +1,12 @@
 import os
 import logging
+import random
+import datetime
 import requests
-import asyncio
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
+import asyncio
 
 API_TOKEN = os.getenv("API_TOKEN")
 APPSCRIPT_URL = os.getenv("APPSCRIPT_URL")  # URL веб-додатку з Apps Script
@@ -22,6 +24,7 @@ user_state = {}
 
 # Кнопки
 cancel_kb = ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text="❌ Скасувати")]], resize_keyboard=True)
+
 device_kb = ReplyKeyboardMarkup(
     keyboard=[
         [KeyboardButton(text="📱 Телефон"), KeyboardButton(text="💻 Ноутбук")],
@@ -29,6 +32,17 @@ device_kb = ReplyKeyboardMarkup(
     ],
     resize_keyboard=True
 )
+
+executors = ["Майстер Дмитро", "Майстер Андрій", "Майстер Максим"]
+parts = ["Акумулятор IP11", "Акумулятор A50", "Екран iPhone 12", "Роз'єм зарядки", "Камера iPhone"]
+
+def make_random_fields():
+    executor = random.choice(executors)
+    part = random.choice(parts)
+    price = random.randint(500, 3000)
+    start_date = datetime.date.today().strftime("%d.%m.%Y")
+    end_date = "-"  # поки не завершено
+    return executor, part, price, start_date, end_date
 
 @dp.message(Command("start"))
 async def start(message: types.Message):
@@ -64,6 +78,9 @@ async def collect(message: types.Message):
     elif step == "problem":
         user_state[uid]["problem"] = message.text
 
+        # генеруємо випадкові значення
+        executor, part, price, start_date, end_date = make_random_fields()
+
         # надсилаємо у Google Sheets
         try:
             requests.post(APPSCRIPT_URL, json={
@@ -72,13 +89,22 @@ async def collect(message: types.Message):
                 "phone": user_state[uid]["phone"],
                 "device": user_state[uid]["device"],
                 "problem": user_state[uid]["problem"],
-                "random": True
+                "executor": executor,
+                "part": part,
+                "price": price,
+                "start_date": start_date,
+                "end_date": end_date
             })
-            await message.answer("✅ Дякуємо! Заявку прийнято.", reply_markup=ReplyKeyboardRemove())
+            await message.answer(
+                f"✅ Дякуємо! Заявку прийнято.\n"
+                f"Ваш майстер: {executor}\n"
+                f"Запчастина: {part}\n"
+                f"Ціна: {price} грн",
+                reply_markup=ReplyKeyboardRemove()
+            )
         except Exception as e:
             logging.error(f"Помилка відправки в Google: {e}")
             await message.answer("⚠ Не вдалося записати заявку. Спробуйте пізніше.")
-
         user_state.pop(uid, None)
 
 # Запуск
