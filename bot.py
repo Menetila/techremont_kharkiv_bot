@@ -71,7 +71,7 @@ async def collect(message: types.Message):
                 "name": user_state[uid]["name"],
                 "phone": user_state[uid]["phone"],
                 "device": user_state[uid]["device"],
-                "problem": user_state[uid]["problem"]
+                "problem": user_state[uid]["problem"],
                 "random": True
             })
             await message.answer("✅ Дякуємо! Заявку прийнято.", reply_markup=ReplyKeyboardRemove())
