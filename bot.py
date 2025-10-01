@@ -1,32 +1,30 @@
 import logging
-import os
 from aiogram import Bot, Dispatcher, executor, types
 
-# Токен беремо з ENV змінної BOT_TOKEN
-API_TOKEN = os.getenv("BOT_TOKEN")
-
-if not API_TOKEN:
-    raise ValueError("⚠️ BOT_TOKEN не знайдено! Додай його в Railway Variables.")
+API_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"  # встав сюди токен від BotFather
 
 logging.basicConfig(level=logging.INFO)
 
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher(bot)
 
-# Простий "реєстр заявок"
+# Словник для заявок {user_id: {"name": ..., "device": ..., "status": ...}}
 orders = {}
 
+# Стартове повідомлення
 @dp.message_handler(commands=["start"])
 async def start(message: types.Message):
     await message.reply("👋 Вітаємо у сервісному центрі!\n"
                         "Напишіть своє ім'я, щоб ми оформили заявку.")
 
-@dp.message_handler(lambda m: m.from_user.id not in orders)
+# Отримуємо ім'я
+@dp.message_handler(lambda m: message.from_user.id not in orders)
 async def get_name(message: types.Message):
     user_id = message.from_user.id
     orders[user_id] = {"name": message.text, "device": None, "status": "Нова"}
     await message.answer("📱 Який пристрій потребує ремонту?")
 
+# Отримуємо тип пристрою
 @dp.message_handler(lambda m: orders.get(m.from_user.id) and not orders[m.from_user.id]["device"])
 async def get_device(message: types.Message):
     user_id = message.from_user.id
@@ -36,6 +34,7 @@ async def get_device(message: types.Message):
                          f"Пристрій: {orders[user_id]['device']}\n\n"
                          "Очікуйте повідомлення про статус ремонту.")
 
+# Команда для адміністратора (оновлення статусу)
 @dp.message_handler(commands=["update"])
 async def update_status(message: types.Message):
     try:
