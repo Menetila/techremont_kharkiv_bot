@@ -1,5 +1,7 @@
 import logging
-from aiogram import Bot, Dispatcher, executor, types
+import asyncio
+from aiogram import Bot, Dispatcher, types
+from aiogram.filters import Command
 
 # 🔑 Встав сюди свій токен
 API_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"
@@ -9,26 +11,26 @@ logging.basicConfig(level=logging.INFO)
 
 # Ініціалізація
 bot = Bot(token=API_TOKEN)
-dp = Dispatcher(bot)
+dp = Dispatcher()
 
 # Словник заявок: {user_id: {"name": ..., "device": ..., "status": ...}}
 orders = {}
 
 
 # 🚀 Команда /start
-@dp.message_handler(commands=["start"])
+@dp.message(Command("start"))
 async def start(message: types.Message):
     user_id = message.from_user.id
     if user_id not in orders:
-        await message.reply("👋 Вітаємо у сервісному центрі!\n"
-                            "Напишіть своє ім'я, щоб оформити заявку.")
+        await message.answer("👋 Вітаємо у сервісному центрі!\n"
+                             "Напишіть своє ім'я, щоб оформити заявку.")
     else:
-        await message.reply("✅ У вас вже є активна заявка.\n"
-                            "Очікуйте оновлення статусу.")
+        await message.answer("✅ У вас вже є активна заявка.\n"
+                             "Очікуйте оновлення статусу.")
 
 
 # 📝 Отримуємо ім’я
-@dp.message_handler(lambda m: m.from_user.id not in orders)
+@dp.message(lambda m: m.from_user.id not in orders)
 async def get_name(message: types.Message):
     user_id = message.from_user.id
     orders[user_id] = {"name": message.text, "device": None, "status": "Нова"}
@@ -36,7 +38,7 @@ async def get_name(message: types.Message):
 
 
 # 🔧 Отримуємо пристрій
-@dp.message_handler(lambda m: orders.get(m.from_user.id) and not orders[m.from_user.id]["device"])
+@dp.message(lambda m: orders.get(m.from_user.id) and not orders[m.from_user.id]["device"])
 async def get_device(message: types.Message):
     user_id = message.from_user.id
     orders[user_id]["device"] = message.text
@@ -51,7 +53,7 @@ async def get_device(message: types.Message):
 
 
 # 🔄 Оновлення статусу (адмін)
-@dp.message_handler(commands=["update"])
+@dp.message(Command("update"))
 async def update_status(message: types.Message):
     try:
         args = message.text.split(" ", 2)
@@ -73,5 +75,9 @@ async def update_status(message: types.Message):
         await message.answer("⚠ Сталася помилка. Перевірте команду.")
 
 
+# 🚀 Запуск
+async def main():
+    await dp.start_polling(bot)
+
 if __name__ == "__main__":
-    executor.start_polling(dp, skip_updates=True)
+    asyncio.run(main())
