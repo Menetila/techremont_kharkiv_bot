@@ -1,10 +1,13 @@
+import os
 import logging
 import asyncio
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 
-# 🔑 Встав сюди свій токен
-API_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"
+# 🔑 Токен беремо з середовища
+API_TOKEN = os.getenv("API_TOKEN")
+if not API_TOKEN:
+    raise ValueError("❌ Не знайдено API_TOKEN у змінних середовища Railway!")
 
 # Налаштування логів
 logging.basicConfig(level=logging.INFO)
