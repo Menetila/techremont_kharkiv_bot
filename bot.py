@@ -1,35 +1,23 @@
 import os
-import logging
-import asyncio
+import requests
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 
-# 🔑 Токен беремо з середовища
 API_TOKEN = os.getenv("API_TOKEN")
-if not API_TOKEN:
-    raise ValueError("❌ Не знайдено API_TOKEN у змінних середовища Railway!")
+GSHEETS_WEBHOOK = os.getenv("GSHEETS_WEBHOOK")  # URL вебхука з Apps Script
 
-# Налаштування логів
-logging.basicConfig(level=logging.INFO)
-
-# Ініціалізація
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher()
-
-# Словник заявок: {user_id: {"name": ..., "device": ..., "status": ...}}
 orders = {}
 
-
-# 🚀 Команда /start
+# 🚀 /start
 @dp.message(Command("start"))
 async def start(message: types.Message):
     user_id = message.from_user.id
     if user_id not in orders:
-        await message.answer("👋 Вітаємо у сервісному центрі!\n"
-                             "Напишіть своє ім'я, щоб оформити заявку.")
+        await message.answer("👋 Вітаємо! Напишіть своє ім’я.")
     else:
-        await message.answer("✅ У вас вже є активна заявка.\n"
-                             "Очікуйте оновлення статусу.")
+        await message.answer("✅ У вас вже є заявка.")
 
 
 # 📝 Отримуємо ім’я
@@ -40,47 +28,54 @@ async def get_name(message: types.Message):
     await message.answer("📱 Який пристрій потребує ремонту?")
 
 
-# 🔧 Отримуємо пристрій
+# 🔧 Отримуємо пристрій та зберігаємо у Google Sheets
 @dp.message(lambda m: orders.get(m.from_user.id) and not orders[m.from_user.id]["device"])
 async def get_device(message: types.Message):
     user_id = message.from_user.id
     orders[user_id]["device"] = message.text
+
+    # Відправляємо в Google Sheets через Apps Script Webhook
+    data = {
+        "user_id": user_id,
+        "name": orders[user_id]["name"],
+        "device": orders[user_id]["device"]
+    }
+    try:
+        requests.post(GSHEETS_WEBHOOK, json=data)
+    except Exception as e:
+        print("Помилка при відправці в Google Sheets:", e)
 
     await message.answer(
         f"✅ Заявку прийнято!\n"
         f"Номер: #{user_id}\n"
         f"Клієнт: {orders[user_id]['name']}\n"
         f"Пристрій: {orders[user_id]['device']}\n\n"
-        "Очікуйте повідомлення про статус ремонту."
+        "Очікуйте оновлення статусу."
     )
 
 
-# 🔄 Оновлення статусу (адмін)
-@dp.message(Command("update"))
-async def update_status(message: types.Message):
-    try:
-        args = message.text.split(" ", 2)
-        if len(args) < 3:
-            await message.answer("⚠ Використання: /update user_id Новий_статус")
-            return
+# 📌 Endpoint для оновлення статусу з Google Sheets
+from fastapi import FastAPI, Request
+import uvicorn
 
-        user_id = int(args[1])
-        new_status = args[2]
+app = FastAPI()
 
-        if user_id in orders:
-            orders[user_id]["status"] = new_status
-            await bot.send_message(user_id, f"🔔 Статус вашої заявки оновлено: {new_status}")
-            await message.answer("✅ Статус оновлено")
-        else:
-            await message.answer("❌ Клієнта не знайдено")
-    except Exception as e:
-        logging.error(f"Помилка у /update: {e}")
-        await message.answer("⚠ Сталася помилка. Перевірте команду.")
+@app.post("/send_status")
+async def send_status(request: Request):
+    data = await request.json()
+    user_id = int(data["user_id"])
+    status = data["status"]
+    await bot.send_message(user_id, f"🔔 Ваш статус оновлено: {status}")
+    return {"ok": True}
 
 
 # 🚀 Запуск
+import asyncio
+
 async def main():
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    loop = asyncio.get_event_loop()
+    loop.create_task(main())
+    uvicorn.run(app, host="0.0.0.0", port=8000)
